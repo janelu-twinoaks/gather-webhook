@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@gathertown/gather-game-client": "^33.0.0",
-    "node-fetch": "^3.0.0"
+    "node-fetch": "^3.0.0",
+    "ws": "^8.17.0"
   }
 }
