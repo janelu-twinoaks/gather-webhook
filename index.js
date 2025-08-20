@@ -2,42 +2,35 @@ import { Game } from "@gathertown/gather-game-client";
 import fetch from "node-fetch";
 
 const API_KEY = process.env.GATHER_API_KEY;
-const SPACE_ID = process.env.SPACE_ID; // 格式通常是 "yourspaceid/yourmap"
+const SPACE_ID = process.env.SPACE_ID; // 格式: "spaceId/mapId"
 const PIPEDREAM_WEBHOOK_URL = process.env.PIPEDREAM_WEBHOOK_URL;
 
-// 初始化遊戲物件，SDK 會自動幫你處理 WebSocket
+// 初始化 Gather Town 連線
 const game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
-
-// 連線到 Gather Town
 game.connect();
 
-// 當成功連線
+// 連線狀態監控
 game.subscribeToConnection((connected) => {
-  if (connected) {
-    console.log("✅ Connected to Gather Town!");
-  } else {
-    console.log("❌ Disconnected from Gather Town!");
-  }
+  console.log(connected ? "✅ Connected to Gather Town!" : "❌ Disconnected from Gather Town!");
 });
 
-// 監聽玩家進入
+// 玩家進入
 game.subscribeToEvent("playerJoins", async (data) => {
   await sendWebhook("playerJoins", data.playerId);
 });
 
-// 監聽玩家離開
+// 玩家離開
 game.subscribeToEvent("playerExits", async (data) => {
   await sendWebhook("playerExits", data.playerId);
 });
 
-// 封裝 webhook 發送
+// 發送到 Pipedream
 async function sendWebhook(event, userId) {
   const payload = {
     userId,
     event,
     timestamp: new Date().toISOString(),
   };
-
   console.log("📤 Sending to Pipedream:", payload);
 
   try {
