@@ -1,5 +1,8 @@
 import { Game } from "@gathertown/gather-game-client";
 import fetch from "node-fetch";
+import WebSocket from "ws";
+
+global.WebSocket = WebSocket; // 讓 SDK 能在 Node.js 使用 WebSocket
 
 const API_KEY = process.env.GATHER_API_KEY;
 const SPACE_ID = process.env.SPACE_ID; // 格式: "spaceId/mapId"
@@ -9,7 +12,7 @@ const PIPEDREAM_WEBHOOK_URL = process.env.PIPEDREAM_WEBHOOK_URL;
 const game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
 game.connect();
 
-// 連線狀態監控
+// 監控連線狀態
 game.subscribeToConnection((connected) => {
   console.log(connected ? "✅ Connected to Gather Town!" : "❌ Disconnected from Gather Town!");
 });
@@ -24,13 +27,9 @@ game.subscribeToEvent("playerExits", async (data) => {
   await sendWebhook("playerExits", data.playerId);
 });
 
-// 發送到 Pipedream
+// 封裝發送到 Pipedream
 async function sendWebhook(event, userId) {
-  const payload = {
-    userId,
-    event,
-    timestamp: new Date().toISOString(),
-  };
+  const payload = { userId, event, timestamp: new Date().toISOString() };
   console.log("📤 Sending to Pipedream:", payload);
 
   try {
@@ -39,10 +38,7 @@ async function sendWebhook(event, userId) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
-    if (!res.ok) {
-      console.error("❌ Failed to send webhook:", res.status, await res.text());
-    }
+    if (!res.ok) console.error("❌ Failed to send webhook:", res.status, await res.text());
   } catch (err) {
     console.error("❌ Error sending webhook:", err);
   }
