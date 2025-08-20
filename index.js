@@ -5,7 +5,8 @@ const API_KEY = process.env.GATHER_API_KEY;
 const SPACE_ID = process.env.SPACE_ID;
 const PIPEDREAM_WEBHOOK_URL = process.env.PIPEDREAM_WEBHOOK_URL;
 
-const ws = new WebSocket(`wss://gather.town/api?apiKey=${API_KEY}&spaceId=${SPACE_ID}`);
+const ws = new WebSocket(`wss://gather.town/api/v2/${SPACE_ID}/ws?apiKey=${API_KEY}`);
+
 
 ws.on("open", () => console.log("Connected to Gather Town WebSocket"));
 
