@@ -25,25 +25,12 @@ const SPACE_ID = process.env.SPACE_ID;
 const API_KEY = process.env.API_KEY;
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
-// Map 存 encId 對應玩家資訊
-const players = new Map();
-
 const game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
 game.connect();
 
-// 連線後抓目前所有玩家資訊
-game.subscribeToConnection(async (connected) => {
+game.subscribeToConnection((connected) => {
   if (connected) {
     console.log("✅ Connected to Gather Town!");
-    try {
-      const allPlayers = await game.getPlayersInfo();
-      for (const [encId, playerInfo] of Object.entries(allPlayers)) {
-        players.set(Number(encId), playerInfo);
-      }
-      console.log("✅ Fetched all players info:", players);
-    } catch (err) {
-      console.error("❌ Failed to fetch players:", err);
-    }
   }
 });
 
@@ -55,9 +42,7 @@ async function sendWebhook(event, userId, name) {
     event,
     timestamp: new Date().toISOString(),
   };
-
   console.log("📤 Sending to Pipedream:", payload);
-
   try {
     await fetch(WEBHOOK_URL, {
       method: "POST",
@@ -71,36 +56,34 @@ async function sendWebhook(event, userId, name) {
 
 // 👥 Player Joins
 game.subscribeToEvent("playerJoins", async (data) => {
-  console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
   const encId = data?.playerJoins?.encId;
   if (!encId) return;
 
-  // 等待幾毫秒再抓，確保玩家資料已更新
+  // 等 200ms 確保 game.players 已更新
   await new Promise((r) => setTimeout(r, 200));
-  const player = players.get(encId) || (await game.getPlayer(encId));
-  players.set(encId, player);
 
+  const player = game.players[encId];
   const userId = player?.userId || "unknown";
   const name = player?.name || "unknown";
 
+  console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
   console.log("✅ Resolved player:", { encId, userId, name });
+
   await sendWebhook("playerJoins", userId, name);
 });
 
 // 👋 Player Exits
 game.subscribeToEvent("playerExits", async (data) => {
-  console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
   const encId = data?.playerExits?.encId;
   if (!encId) return;
 
-  const player = players.get(encId);
+  // Player 可能已經從 game.players 移除，name 可能抓不到
+  const player = game.players[encId];
   const userId = player?.userId || "unknown";
   const name = player?.name || "unknown";
 
+  console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
   console.log("✅ Resolved player:", { encId, userId, name });
+
   await sendWebhook("playerExits", userId, name);
-
-  // 移除 Map
-  players.delete(encId);
 });
-
