@@ -60,9 +60,9 @@ game.subscribeToEvent("playerJoins", async (data) => {
   console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
 
   const encId = data?.playerJoins?.encId;
-  const player = game.players[encId]; // 用 encId 找玩家
-  const userId = player?.userId || "unknown";
-  const name = player?.name || "unknown";
+  const playerInfo = data?.playerJoins?.playerInfo || {};
+  const userId = playerInfo.userId || "unknown";
+  const name = playerInfo.name || "unknown";
 
   console.log("✅ Resolved player:", { encId, userId, name });
 
@@ -74,9 +74,9 @@ game.subscribeToEvent("playerExits", async (data) => {
   console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
 
   const encId = data?.playerExits?.encId;
-  const player = game.players[encId];
-  const userId = player?.userId || "unknown";
-  const name = player?.name || "unknown";
+  const playerInfo = data?.playerJoins?.playerInfo || {};
+  const userId = playerInfo.userId || "unknown";
+  const name = playerInfo.name || "unknown";
 
   console.log("✅ Resolved player:", { encId, userId, name });
 
