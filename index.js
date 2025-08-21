@@ -36,7 +36,7 @@ game.subscribeToConnection(async (connected) => {
   if (connected) {
     console.log("✅ Connected to Gather Town!");
     try {
-      const allPlayers = await game.getPlayers();
+      const allPlayers = await game.getPlayersInfo();
       for (const [encId, playerInfo] of Object.entries(allPlayers)) {
         players.set(Number(encId), playerInfo);
       }
