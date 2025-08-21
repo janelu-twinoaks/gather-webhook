@@ -1,56 +1,76 @@
-import { Game } from "@gathertown/gather-game-client";
+import express from "express";
 import fetch from "node-fetch";
-import WebSocket from "ws"; // <- 新增
+import { Game } from "@gathertown/gather-game-client";
 
-// 告訴 Gather SDK 用這個 ws
-global.WebSocket = WebSocket;
+// 🚀 Express 假 server，Render 需要有 port 綁定
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get("/", (req, res) => {
+  res.send("Gather Webhook Service is running 🚀");
+});
+app.listen(PORT, () => {
+  console.log(`✅ Express server running on port ${PORT}`);
+});
 
-const API_KEY = process.env.GATHER_API_KEY;
+// Gather 連線
 const SPACE_ID = process.env.SPACE_ID;
-const PIPEDREAM_WEBHOOK_URL = process.env.PIPEDREAM_WEBHOOK_URL;
+const API_KEY = process.env.API_KEY;
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
-// 初始化遊戲物件
 const game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
-
 game.connect();
-
 game.subscribeToConnection((connected) => {
-  console.log(connected ? "✅ Connected to Gather Town!" : "❌ Disconnected from Gather Town!");
+  if (connected) {
+    console.log("✅ Connected to Gather Town!");
+  }
 });
 
-game.subscribeToEvent("playerJoins", async (data) => {
-  console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2)); // 加上這一行
+// 🔄 Webhook 發送 function
+async function sendWebhook(event, userId, name) {
+  const payload = {
+    userId,
+    name,
+    event,
+    timestamp: new Date().toISOString(),
+  };
 
-  const userId =
-    data?.playerJoins?.id ||
-    data?.playerJoins?.userId ||
-    "unknown";
-
-  await sendWebhook("playerJoins", userId);
-});
-
-game.subscribeToEvent("playerExits", async (data) => {
-  console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2)); // 加上這一行
-
-  const userId =
-    data?.playerExits?.id ||
-    data?.playerExits?.userId ||
-    "unknown";
-
-  await sendWebhook("playerExits", userId);
-});
-
-async function sendWebhook(event, userId) {
-  const payload = { userId, event, timestamp: new Date().toISOString() };
   console.log("📤 Sending to Pipedream:", payload);
+
   try {
-    const res = await fetch(PIPEDREAM_WEBHOOK_URL, {
+    await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) console.error("❌ Failed:", res.status, await res.text());
   } catch (err) {
-    console.error("❌ Error sending webhook:", err);
+    console.error("❌ Failed to send webhook:", err);
   }
 }
+
+// 👥 Player Joins
+game.subscribeToEvent("playerJoins", async (data) => {
+  console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
+
+  const encId = data?.playerJoins?.encId;
+  const player = game.players[encId]; // 用 encId 找玩家
+  const userId = player?.userId || "unknown";
+  const name = player?.name || "unknown";
+
+  console.log("✅ Resolved player:", { encId, userId, name });
+
+  await sendWebhook("playerJoins", userId, name);
+});
+
+// 👋 Player Exits
+game.subscribeToEvent("playerExits", async (data) => {
+  console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
+
+  const encId = data?.playerExits?.encId;
+  const player = game.players[encId];
+  const userId = player?.userId || "unknown";
+  const name = player?.name || "unknown";
+
+  console.log("✅ Resolved player:", { encId, userId, name });
+
+  await sendWebhook("playerExits", userId, name);
+});
