@@ -34,15 +34,16 @@ game.subscribeToConnection((connected) => {
   }
 });
 
-// 🔄 Webhook 發送 function
-async function sendWebhook(event, userId, name) {
+// 🔄 Webhook 發送 function，只傳 encId
+async function sendWebhook(event, encId) {
   const payload = {
-    userId,
-    name,
+    encId,
     event,
     timestamp: new Date().toISOString(),
   };
+
   console.log("📤 Sending to Pipedream:", payload);
+
   try {
     await fetch(WEBHOOK_URL, {
       method: "POST",
@@ -57,33 +58,17 @@ async function sendWebhook(event, userId, name) {
 // 👥 Player Joins
 game.subscribeToEvent("playerJoins", async (data) => {
   const encId = data?.playerJoins?.encId;
-  if (!encId) return;
-
-  // 等 200ms 確保 game.players 已更新
-  await new Promise((r) => setTimeout(r, 200));
-
-  const player = game.players[encId];
-  const userId = player?.userId || "unknown";
-  const name = player?.name || "unknown";
-
   console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
-  console.log("✅ Resolved player:", { encId, userId, name });
+  console.log("✅ Resolved player encId:", encId);
 
-  await sendWebhook("playerJoins", userId, name);
+  await sendWebhook("playerJoins", encId);
 });
 
 // 👋 Player Exits
 game.subscribeToEvent("playerExits", async (data) => {
   const encId = data?.playerExits?.encId;
-  if (!encId) return;
-
-  // Player 可能已經從 game.players 移除，name 可能抓不到
-  const player = game.players[encId];
-  const userId = player?.userId || "unknown";
-  const name = player?.name || "unknown";
-
   console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
-  console.log("✅ Resolved player:", { encId, userId, name });
+  console.log("✅ Resolved player encId:", encId);
 
-  await sendWebhook("playerExits", userId, name);
+  await sendWebhook("playerExits", encId);
 });
