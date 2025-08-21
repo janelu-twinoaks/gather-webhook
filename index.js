@@ -19,12 +19,24 @@ game.subscribeToConnection((connected) => {
 });
 
 game.subscribeToEvent("playerJoins", async (data) => {
-  const userId = data.userId || data.playerId || "unknown";
+  console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2)); // 加上這一行
+
+  const userId =
+    data?.playerJoins?.id ||
+    data?.playerJoins?.userId ||
+    "unknown";
+
   await sendWebhook("playerJoins", userId);
 });
 
 game.subscribeToEvent("playerExits", async (data) => {
-  const userId = data.userId || data.playerId || "unknown";
+  console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2)); // 加上這一行
+
+  const userId =
+    data?.playerExits?.id ||
+    data?.playerExits?.userId ||
+    "unknown";
+
   await sendWebhook("playerExits", userId);
 });
 
