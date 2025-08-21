@@ -25,15 +25,6 @@ const SPACE_ID = process.env.SPACE_ID;
 const API_KEY = process.env.API_KEY;
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
-const game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
-game.connect();
-game.subscribeToConnection((connected) => {
-  if (connected) {
-    console.log("✅ Connected to Gather Town!");
-  }
-});
-
-
 // Map 存 encId 對應玩家資訊
 const players = new Map();
 
