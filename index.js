@@ -1,3 +1,6 @@
+import { performance } from 'perf_hooks';
+global.performance = performance;
+
 import express from "express";
 import fetch from "node-fetch";
 import { Game } from "@gathertown/gather-game-client";
