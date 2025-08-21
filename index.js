@@ -1,6 +1,9 @@
 import express from "express";
 import fetch from "node-fetch";
 import { Game } from "@gathertown/gather-game-client";
+import AbortController from "abort-controller";
+global.AbortController = AbortController;
+
 
 // 🚀 Express 假 server，Render 需要有 port 綁定
 const app = express();
