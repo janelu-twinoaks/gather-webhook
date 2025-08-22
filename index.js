@@ -1,4 +1,4 @@
-import { performance } from 'perf_hooks';
+import { performance } from "perf_hooks";
 global.performance = performance;
 
 import express from "express";
@@ -8,7 +8,6 @@ import AbortController from "abort-controller";
 global.AbortController = AbortController;
 import WebSocket from "ws";
 global.WebSocket = WebSocket;
-
 
 // 🚀 Express 假 server，Render 需要有 port 綁定
 const app = express();
@@ -20,19 +19,53 @@ app.listen(PORT, () => {
   console.log(`✅ Express server running on port ${PORT}`);
 });
 
-// Gather 連線
+// Gather config
 const SPACE_ID = process.env.SPACE_ID;
 const API_KEY = process.env.API_KEY;
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
-const game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
-game.connect();
+let game;
 
-game.subscribeToConnection((connected) => {
-  if (connected) {
-    console.log("✅ Connected to Gather Town!");
-  }
-});
+// 建立連線 function（支援自動重連）
+function connectGather() {
+  console.log("🔌 Connecting to Gather Town...");
+
+  game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
+  game.connect();
+
+  game.subscribeToConnection((connected) => {
+    if (connected) {
+      console.log("✅ Connected to Gather Town!");
+    } else {
+      console.log("❌ Disconnected from Gather Town, retrying in 5s...");
+      setTimeout(connectGather, 5000);
+    }
+  });
+
+  // 👥 Player Joins
+  game.subscribeToEvent("playerJoins", async (data) => {
+    const encId = data?.playerJoins?.encId;
+    console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
+    console.log("✅ Resolved player encId:", encId);
+    await sendWebhook("playerJoins", encId);
+  });
+
+  // 👋 Player Exits
+  game.subscribeToEvent("playerExits", async (data) => {
+    const encId = data?.playerExits?.encId;
+    console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
+    console.log("✅ Resolved player encId:", encId);
+    await sendWebhook("playerExits", encId);
+  });
+
+  // ❤️ Heartbeat，每 20 秒發一次，避免 idle 斷線
+  setInterval(() => {
+    if (game.connected) {
+      console.log("💓 Sending heartbeat to Gather...");
+      game.spaceUpdates([], true);
+    }
+  }, 20000);
+}
 
 // 🔄 Webhook 發送 function，只傳 encId
 async function sendWebhook(event, encId) {
@@ -55,20 +88,5 @@ async function sendWebhook(event, encId) {
   }
 }
 
-// 👥 Player Joins
-game.subscribeToEvent("playerJoins", async (data) => {
-  const encId = data?.playerJoins?.encId;
-  console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
-  console.log("✅ Resolved player encId:", encId);
-
-  await sendWebhook("playerJoins", encId);
-});
-
-// 👋 Player Exits
-game.subscribeToEvent("playerExits", async (data) => {
-  const encId = data?.playerExits?.encId;
-  console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
-  console.log("✅ Resolved player encId:", encId);
-
-  await sendWebhook("playerExits", encId);
-});
+// 🚀 啟動連線
+connectGather();
