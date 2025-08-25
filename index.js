@@ -9,6 +9,9 @@ global.AbortController = AbortController;
 import WebSocket from "ws";
 global.WebSocket = WebSocket;
 
+import { google } from "googleapis";
+import schedule from "node-schedule";
+
 // 🚀 Express server
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,14 +21,51 @@ const EVENTS_FILE = "./events.json";
 // 安全 token
 const EVENTS_TOKEN = process.env.EVENTS_TOKEN || "my_secret_token";
 
+// Google Sheet config
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID; // Google Sheet ID
+const SHEET_NAME = process.env.SHEET_NAME || "辦公室進出紀錄";
+
 // 確保 JSON 檔存在
 if (!fs.existsSync(EVENTS_FILE)) fs.writeFileSync(EVENTS_FILE, "[]", "utf8");
+
+// Google Sheets API 認證
+const auth = new google.auth.GoogleAuth({
+  keyFile: "credentials.json", // Render Secret File
+  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+});
+const sheets = google.sheets({ version: "v4", auth });
+
+// ── Helpers ──
 
 // 新增事件到 JSON
 function saveEvent(event) {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
   data.push(event);
   fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2), "utf8");
+}
+
+// 寫入 Google Sheet
+async function appendEventsToSheet() {
+  const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
+  if (!data.length) return console.log("📄 No events to append");
+
+  const values = data.map((e) => [e.encId, e.event, e.timestamp, e.name]);
+
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_NAME}!A:D`,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values },
+    });
+
+    console.log(`✅ ${values.length} events appended to Google Sheet`);
+    // 清空 JSON
+    fs.writeFileSync(EVENTS_FILE, "[]", "utf8");
+  } catch (err) {
+    console.error("❌ Failed to append events:", err);
+  }
 }
 
 // ── Web endpoints ──
@@ -37,7 +77,7 @@ app.get("/", (req, res) => {
 
 // 🔒 安全版 /events endpoint
 app.get("/events", (req, res) => {
-  const token = req.query.token; // 從 ?token=xxx 取得
+  const token = req.query.token;
   if (token !== EVENTS_TOKEN) {
     return res.status(403).send("❌ Forbidden: Invalid token");
   }
@@ -102,3 +142,14 @@ function connectGather() {
 }
 
 connectGather();
+
+// ── 定時整理 JSON → Google Sheet ──
+
+// 範例：每 10 分鐘整理一次
+schedule.scheduleJob("*/10 * * * *", () => {
+  console.log("⏱ Running scheduled job: append events to Google Sheet");
+  appendEventsToSheet().catch(console.error);
+});
+
+// 可選：每次程式啟動時，也整理一次，確保之前暫存的資料先寫入
+appendEventsToSheet().catch(console.error);
