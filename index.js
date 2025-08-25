@@ -145,11 +145,11 @@ connectGather();
 
 // ── 定時整理 JSON → Google Sheet ──
 
-// 範例：每 10 分鐘整理一次
-schedule.scheduleJob("*/10 * * * *", () => {
+// 每 5 分鐘整理一次
+schedule.scheduleJob("*/5 * * * *", () => {
   console.log("⏱ Running scheduled job: append events to Google Sheet");
   appendEventsToSheet().catch(console.error);
 });
 
-// 可選：每次程式啟動時，也整理一次，確保之前暫存的資料先寫入
+// 每次程式啟動時，也整理一次，確保之前暫存的資料先寫入
 appendEventsToSheet().catch(console.error);
