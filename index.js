@@ -1,4 +1,4 @@
-import { performance } from "perf_hooks";
+import { performance } from "perf_hooks"; 
 global.performance = performance;
 
 import express from "express";
@@ -26,6 +26,34 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
 let game;
 
+// 🔄 事件 queue
+let eventQueue = [];
+
+// 批次發送 webhook
+async function flushQueue() {
+  if (eventQueue.length === 0) return;
+
+  const batch = [...eventQueue]; // 拷貝當前 queue
+  eventQueue = []; // 清空 queue，失敗的會重新丟回
+
+  for (const event of batch) {
+    try {
+      await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+      });
+      console.log("📤 Sent webhook:", event);
+    } catch (err) {
+      console.error("❌ Failed to send webhook, re-queueing:", event, err);
+      eventQueue.push(event); // 失敗重新丟回 queue
+    }
+  }
+}
+
+// 每 10 秒批次送一次
+setInterval(flushQueue, 10000);
+
 // 建立連線 function（支援自動重連）
 function connectGather() {
   console.log("🔌 Connecting to Gather Town...");
@@ -43,19 +71,27 @@ function connectGather() {
   });
 
   // 👥 Player Joins
-  game.subscribeToEvent("playerJoins", async (data) => {
+  game.subscribeToEvent("playerJoins", (data) => {
     const encId = data?.playerJoins?.encId;
     console.log("📥 playerJoins raw data:", JSON.stringify(data, null, 2));
     console.log("✅ Resolved player encId:", encId);
-    await sendWebhook("playerJoins", encId);
+    eventQueue.push({
+      encId,
+      event: "playerJoins",
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // 👋 Player Exits
-  game.subscribeToEvent("playerExits", async (data) => {
+  game.subscribeToEvent("playerExits", (data) => {
     const encId = data?.playerExits?.encId;
     console.log("📥 playerExits raw data:", JSON.stringify(data, null, 2));
     console.log("✅ Resolved player encId:", encId);
-    await sendWebhook("playerExits", encId);
+    eventQueue.push({
+      encId,
+      event: "playerExits",
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // ❤️ Heartbeat，每 20 秒發一次，避免 idle 斷線
@@ -65,27 +101,6 @@ function connectGather() {
       game.spaceUpdates([], true);
     }
   }, 20000);
-}
-
-// 🔄 Webhook 發送 function，只傳 encId
-async function sendWebhook(event, encId) {
-  const payload = {
-    encId,
-    event,
-    timestamp: new Date().toISOString(),
-  };
-
-  console.log("📤 Sending to Pipedream:", payload);
-
-  try {
-    await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch (err) {
-    console.error("❌ Failed to send webhook:", err);
-  }
 }
 
 // 🚀 啟動連線
