@@ -7,7 +7,7 @@ import { Game } from "@gathertown/gather-game-client";
 import AbortController from "abort-controller";
 global.AbortController = AbortController;
 import WebSocket from "ws";
-global.WebSocket = WebSocket";
+global.WebSocket = WebSocket;
 
 // 🚀 Express server
 const app = express();
