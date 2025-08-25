@@ -37,24 +37,26 @@ const sheets = google.sheets({ version: "v4", auth });
 
 // ── Helpers ──
 
-// 新增事件到 JSON
+// 新增事件到 JSON（不存 name）
 function saveEvent(event) {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
-  data.push(event);
+  // 只保留 encId, event, timestamp
+  const { encId, event: evt, timestamp } = event;
+  data.push({ encId, event: evt, timestamp });
   fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
-// 寫入 Google Sheet
+// 寫入 Google Sheet（只寫三個欄位）
 async function appendEventsToSheet() {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
   if (!data.length) return console.log("📄 No events to append");
 
-  const values = data.map((e) => [e.encId, e.event, e.timestamp, e.name]);
+  const values = data.map((e) => [e.encId, e.event, e.timestamp]);
 
   try {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:D`,
+      range: `${SHEET_NAME}!A:C`,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values },
@@ -119,21 +121,19 @@ function connectGather() {
 
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
-    const encId = data?.playerJoins?.encId;
-    const name = data?.playerJoins?.name || "Unknown"; 
-    const timestamp = new Date().toISOString();
-    saveEvent({ encId, event: "playerJoins", timestamp, name });
-    console.log("📥 playerJoins saved:", encId, name, timestamp);
-  });
+  const encId = data?.playerJoins?.encId;
+  const timestamp = new Date().toISOString();
+  saveEvent({ encId, event: "playerJoins", timestamp });
+  console.log("📥 playerJoins saved:", encId, timestamp);
+});
 
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
-    const encId = data?.playerExits?.encId;
-    const name = data?.playerExits?.name || "Unknown";
-    const timestamp = new Date().toISOString();
-    saveEvent({ encId, event: "playerExits", timestamp, name });
-    console.log("📥 playerExits saved:", encId, name, timestamp);
-  });
+  const encId = data?.playerExits?.encId;
+  const timestamp = new Date().toISOString();
+  saveEvent({ encId, event: "playerExits", timestamp });
+  console.log("📥 playerExits saved:", encId, timestamp);
+});
 
   // Heartbeat
   setInterval(() => {
