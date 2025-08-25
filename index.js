@@ -30,7 +30,7 @@ if (!fs.existsSync(EVENTS_FILE)) fs.writeFileSync(EVENTS_FILE, "[]", "utf8");
 
 // Google Sheets API 認證
 const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json", // Render Secret File
+  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 const sheets = google.sheets({ version: "v4", auth });
