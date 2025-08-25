@@ -12,23 +12,13 @@ global.WebSocket = WebSocket;
 // 🚀 Express server
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get("/", (req, res) => {
-  res.send("Gather Webhook Service is running 🚀");
-});
-app.listen(PORT, () => {
-  console.log(`✅ Express server running on port ${PORT}`);
-});
 
-// Gather config
-const SPACE_ID = process.env.SPACE_ID;
-const API_KEY = process.env.API_KEY;
-
-let game;
-
-// JSON 檔存事件
+// 暫存 JSON 檔
 const EVENTS_FILE = "./events.json";
+// 安全 token
+const EVENTS_TOKEN = process.env.EVENTS_TOKEN || "my_secret_token";
 
-// 確保檔案存在
+// 確保 JSON 檔存在
 if (!fs.existsSync(EVENTS_FILE)) fs.writeFileSync(EVENTS_FILE, "[]", "utf8");
 
 // 新增事件到 JSON
@@ -37,6 +27,40 @@ function saveEvent(event) {
   data.push(event);
   fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2), "utf8");
 }
+
+// ── Web endpoints ──
+
+// 首頁
+app.get("/", (req, res) => {
+  res.send("Gather Webhook Service is running 🚀");
+});
+
+// 🔒 安全版 /events endpoint
+app.get("/events", (req, res) => {
+  const token = req.query.token; // 從 ?token=xxx 取得
+  if (token !== EVENTS_TOKEN) {
+    return res.status(403).send("❌ Forbidden: Invalid token");
+  }
+
+  try {
+    const data = fs.readFileSync(EVENTS_FILE, "utf8");
+    res.setHeader("Content-Type", "application/json");
+    res.send(data);
+  } catch (err) {
+    res.status(500).send("❌ Error reading events.json");
+  }
+});
+
+// 啟動 server
+app.listen(PORT, () => {
+  console.log(`✅ Express server running on port ${PORT}`);
+});
+
+// ── Gather config ──
+const SPACE_ID = process.env.SPACE_ID;
+const API_KEY = process.env.API_KEY;
+
+let game;
 
 // 連線 Gather
 function connectGather() {
