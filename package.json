@@ -9,6 +9,7 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
+    "googleapis": "^121.0.0",  // 版本號可能不同
     "@gathertown/gather-game-client": "^43.0.1",
     "abort-controller": "^3.0.0",
     "express": "^4.19.2",
