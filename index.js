@@ -119,21 +119,36 @@ function connectGather() {
     }
   });
 
+  // ── 玩家狀態暫存 ──
+  const activePlayers = new Set();
+  
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
-  const encId = data?.playerJoins?.encId;
-  const timestamp = new Date().toISOString();
-  saveEvent({ encId, event: "playerJoins", timestamp });
-  console.log("📥 playerJoins saved:", encId, timestamp);
-});
-
+    const encId = data?.playerJoins?.encId;
+    const timestamp = new Date().toISOString();
+  
+    if (!activePlayers.has(encId)) {
+      activePlayers.add(encId);
+      saveEvent({ encId, event: "playerJoins", timestamp });
+      console.log("📥 playerJoins saved:", encId, timestamp);
+    } else {
+      console.log("⚠️ Duplicate join ignored for:", encId);
+    }
+  });
+  
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
-  const encId = data?.playerExits?.encId;
-  const timestamp = new Date().toISOString();
-  saveEvent({ encId, event: "playerExits", timestamp });
-  console.log("📥 playerExits saved:", encId, timestamp);
-});
+    const encId = data?.playerExits?.encId;
+    const timestamp = new Date().toISOString();
+  
+    if (activePlayers.has(encId)) {
+      activePlayers.delete(encId);
+      saveEvent({ encId, event: "playerExits", timestamp });
+      console.log("📥 playerExits saved:", encId, timestamp);
+    } else {
+      console.log("⚠️ Exit ignored (not in activePlayers):", encId);
+    }
+  });
 
   // Heartbeat
   setInterval(() => {
