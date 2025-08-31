@@ -40,18 +40,19 @@ const sheets = google.sheets({ version: "v4", auth });
 // 新增事件到 JSON（不存 name）
 function saveEvent(event) {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
-  // 只保留 encId, event, timestamp
-  const { encId, event: evt, timestamp } = event;
-  data.push({ encId, event: evt, timestamp });
+  // 改成用 playerId 當主 key
+  const { playerId, event: evt, timestamp } = event;
+  data.push({ playerId, event: evt, timestamp });
   fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2), "utf8");
 }
+
 
 // 寫入 Google Sheet（只寫三個欄位）
 async function appendEventsToSheet() {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
   if (!data.length) return console.log("📄 No events to append");
 
-  const values = data.map((e) => [e.encId, e.event, e.timestamp]);
+  const values = data.map((e) => [e.playerId, e.event, e.timestamp]);
 
   try {
     await sheets.spreadsheets.values.append({
@@ -124,29 +125,29 @@ function connectGather() {
   
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
-    const encId = data?.playerJoins?.encId;
+    const playerId = data?.playerJoins?.playerId;
     const timestamp = new Date().toISOString();
   
-    if (!activePlayers.has(encId)) {
-      activePlayers.add(encId);
-      saveEvent({ encId, event: "playerJoins", timestamp });
-      console.log("📥 playerJoins saved:", encId, timestamp);
+    if (!activePlayers.has(playerId)) {
+      activePlayers.add(playerId);
+      saveEvent({ playerId, event: "playerJoins", timestamp });
+      console.log("📥 playerJoins saved:", playerId, timestamp);
     } else {
-      console.log("⚠️ Duplicate join ignored for:", encId);
+      console.log("⚠️ Duplicate join ignored for:", playerId);
     }
   });
   
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
-    const encId = data?.playerExits?.encId;
+    const playerId = data?.playerExits?.playerId;
     const timestamp = new Date().toISOString();
   
-    if (activePlayers.has(encId)) {
-      activePlayers.delete(encId);
-      saveEvent({ encId, event: "playerExits", timestamp });
-      console.log("📥 playerExits saved:", encId, timestamp);
+    if (activePlayers.has(playerId)) {
+      activePlayers.delete(playerId);
+      saveEvent({ playerId, event: "playerExits", timestamp });
+      console.log("📥 playerExits saved:", playerId, timestamp);
     } else {
-      console.log("⚠️ Exit ignored (not in activePlayers):", encId);
+      console.log("⚠️ Exit ignored (not in activePlayers):", playerId);
     }
   });
 
