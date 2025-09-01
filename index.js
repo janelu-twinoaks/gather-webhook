@@ -125,26 +125,36 @@ function connectGather() {
   
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
-    console.log("DEBUG playerJoins event:", data);
+    try {
+      console.log("DEBUG playerJoins event:", data);
   
-    const encId = data?.playerJoins?.encId;
-    const timestamp = new Date().toISOString();
+      const encId = data?.playerJoins?.encId;
+      const timestamp = new Date().toISOString();
   
-    if (!activePlayers.has(encId)) {
-      activePlayers.add(encId);
+      if (!activePlayers.has(encId)) {
+        activePlayers.add(encId);
   
-      // 嘗試拿到玩家資訊
-      const playerInfo = game.state.players[encId];
-      const playerId = playerInfo?.id || encId;
-      const name = playerInfo?.name || "Unknown";
+        // 先預設名字為 Unknown，避免直接讀取未初始化的 state
+        let playerId = encId;
+        let name = "Unknown";
   
-      saveEvent({ playerId, event: "playerJoins", timestamp });
-      console.log("📥 playerJoins saved:", playerId, timestamp, name);
-    } else {
-      console.log("⚠️ Duplicate join ignored for:", encId);
+        // 嘗試拿到玩家資訊（可能還沒同步完成，所以要先檢查）
+        if (game.state?.players?.[encId]) {
+          const playerInfo = game.state.players[encId];
+          playerId = playerInfo.id || encId;
+          name = playerInfo.name || "Unknown";
+        }
+  
+        saveEvent({ playerId, event: "playerJoins", timestamp });
+        console.log("📥 playerJoins saved:", playerId, timestamp, name);
+      } else {
+        console.log("⚠️ Duplicate join ignored for:", encId);
+      }
+    } catch (err) {
+      console.error("error occurred in handler for playerJoins:", err);
     }
   });
-  
+
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
     console.log("DEBUG playerExits event:", data);
