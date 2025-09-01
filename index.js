@@ -125,6 +125,7 @@ function connectGather() {
   
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
+    console.log("DEBUG playerJoins event:", data); // 先看完整結構
     const playerId = data?.playerJoins?.info?.id; // ✅ 在 info 裡面
     const name = data?.playerJoins?.info?.name;
     const timestamp = new Date().toISOString();
@@ -140,7 +141,6 @@ function connectGather() {
   
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
-    console.log("DEBUG playerJoins event:", data); // 先看完整結構
     const playerId = data?.playerExits?.info?.id; // ✅ 在 info 裡面
     const name = data?.playerExits?.info?.name;
     const timestamp = new Date().toISOString();
