@@ -1,4 +1,4 @@
-import { performance } from "perf_hooks"; 
+import { performance } from "perf_hooks";
 global.performance = performance;
 
 import express from "express";
@@ -37,17 +37,15 @@ const sheets = google.sheets({ version: "v4", auth });
 
 // ── Helpers ──
 
-// 新增事件到 JSON（不存 name）
+// 新增事件到 JSON
 function saveEvent(event) {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
-  // 改成用 playerId 當主 key
   const { playerId, event: evt, timestamp } = event;
   data.push({ playerId, event: evt, timestamp });
   fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
-
-// 寫入 Google Sheet（只寫三個欄位）
+// 寫入 Google Sheet
 async function appendEventsToSheet() {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
   if (!data.length) return console.log("📄 No events to append");
@@ -64,16 +62,13 @@ async function appendEventsToSheet() {
     });
 
     console.log(`✅ ${values.length} events appended to Google Sheet`);
-    // 清空 JSON
-    fs.writeFileSync(EVENTS_FILE, "[]", "utf8");
+    fs.writeFileSync(EVENTS_FILE, "[]", "utf8"); // 清空 JSON
   } catch (err) {
     console.error("❌ Failed to append events:", err);
   }
 }
 
 // ── Web endpoints ──
-
-// 首頁
 app.get("/", (req, res) => {
   res.send("Gather Webhook Service is running 🚀");
 });
@@ -94,7 +89,6 @@ app.get("/events", (req, res) => {
   }
 });
 
-// 啟動 server
 app.listen(PORT, () => {
   console.log(`✅ Express server running on port ${PORT}`);
 });
@@ -105,7 +99,7 @@ const API_KEY = process.env.API_KEY;
 
 let game;
 
-// 等待玩家資料（輪詢 game.state.players[encId]，直到有 or 超時）
+// 等待玩家資料
 function waitForPlayerInfo(encId, timeout = 5000, interval = 100) {
   return new Promise((resolve) => {
     let elapsed = 0;
@@ -116,61 +110,65 @@ function waitForPlayerInfo(encId, timeout = 5000, interval = 100) {
         resolve(info);
       } else if ((elapsed += interval) >= timeout) {
         clearInterval(timer);
-        resolve(null); // 超時
+        resolve(null);
       }
     }, interval);
   });
 }
 
-// 追蹤目前在場的 encId 與 encId->玩家資訊的對應
 const activeEncIds = new Set();
 const encIdToMeta = new Map();
 let handlersRegistered = false;
+
+// 暫存玩家資料
+const playersCache = {};
 
 function registerHandlers() {
   if (handlersRegistered) return;
   handlersRegistered = true;
 
-// 暫存玩家資料
-const playersCache = {};
+  // Player Joins
+  game.subscribeToEvent("playerJoins", (data) => {
+    const encId = data.playerJoins.encId;
+    const timestamp = new Date().toISOString();
 
-// Player Joins
-game.subscribeToEvent("playerJoins", (data) => {
-  const encId = data.playerJoins.encId;
-  console.log("DEBUG playerJoins event:", data);
+    playersCache[encId] = { name: "Unknown", joinedAt: timestamp };
 
-  // 先存 encId，名字可能暫時 unknown
-  playersCache[encId] = { name: "Unknown", joinedAt: new Date().toISOString() };
+    // 存事件
+    saveEvent({ playerId: encId, event: "playerJoins", timestamp });
 
-  console.log(`📥 playerJoins saved: ${encId} ${playersCache[encId].joinedAt} Unknown`);
-});
+    console.log(`📥 playerJoins saved: ${encId} ${timestamp} Unknown`);
+  });
 
-// Player Sets Name (補名字)
-game.subscribeToEvent("playerSetsName", (data) => {
-  const { encId, name } = data.playerSetsName;
-  if (playersCache[encId]) {
-    playersCache[encId].name = name;
-    console.log(`✅ Name updated for ${encId}: ${name}`);
-  } else {
-    // 如果沒有 join cache，也補上
-    playersCache[encId] = { name, joinedAt: new Date().toISOString() };
-    console.log(`📥 playerSetsName (late) saved: ${encId} ${name}`);
-  }
-});
+  // Player Sets Name
+  game.subscribeToEvent("playerSetsName", (data) => {
+    const { encId, name } = data.playerSetsName;
+    const timestamp = new Date().toISOString();
+
+    if (playersCache[encId]) {
+      playersCache[encId].name = name;
+      console.log(`✅ Name updated for ${encId}: ${name}`);
+    } else {
+      playersCache[encId] = { name, joinedAt: timestamp };
+      console.log(`📥 playerSetsName (late) saved: ${encId} ${name}`);
+    }
+
+    // 存事件
+    saveEvent({ playerId: encId, event: `setName:${name}`, timestamp });
+  });
 
   // Player Exits
   game.subscribeToEvent("playerExits", async (data) => {
     try {
-      console.log("DEBUG playerExits event:", data);
       const encId = data?.playerExits?.encId;
       const timestamp = new Date().toISOString();
+      console.log("DEBUG playerExits event:", data);
 
       if (!activeEncIds.has(encId)) {
         console.log("⚠️ Exit ignored (not active):", encId);
         return;
       }
 
-      // 先用先前保存的 meta，若沒有再嘗試從 state 補
       let meta = encIdToMeta.get(encId);
       if (!meta) {
         const info = game?.state?.players?.[encId] || (await waitForPlayerInfo(encId, 500));
@@ -188,7 +186,7 @@ game.subscribeToEvent("playerSetsName", (data) => {
   });
 }
 
-// 連線 Gather（先等初始化再註冊 handler）
+// 連線 Gather
 function connectGather() {
   console.log("🔌 Connecting to Gather Town...");
   game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
@@ -199,24 +197,21 @@ function connectGather() {
       console.log("✅ Connected to Gather Town!");
 
       try {
-        // 等初始 state（官方文件也建議這樣做）
         await game.waitForInit();
         const count = Object.keys(game?.state?.players ?? {}).length;
         console.log(`✅ Game init complete. Players in state: ${count}`);
       } catch (e) {
-        console.warn("⚠️ waitForInit failed/timeout, will continue anyway:", e?.message || e);
+        console.warn("⚠️ waitForInit failed/timeout:", e?.message || e);
       }
 
-      // 註冊事件（只註冊一次）
       registerHandlers();
     } else {
       console.log("❌ Disconnected, retrying in 5s...");
-      handlersRegistered = false; // 重新連線時重註冊
+      handlersRegistered = false;
       setTimeout(connectGather, 5000);
     }
   });
 
-  // Heartbeat
   setInterval(() => {
     if (game?.connected) game.spaceUpdates([], true);
   }, 20000);
@@ -224,14 +219,11 @@ function connectGather() {
 
 connectGather();
 
-
 // ── 定時整理 JSON → Google Sheet ──
-
-// 每 5 分鐘整理一次
 schedule.scheduleJob("*/5 * * * *", () => {
   console.log("⏱ Running scheduled job: append events to Google Sheet");
   appendEventsToSheet().catch(console.error);
 });
 
-// 每次程式啟動時，也整理一次，確保之前暫存的資料先寫入
+// 程式啟動時先跑一次
 appendEventsToSheet().catch(console.error);
