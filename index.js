@@ -105,6 +105,25 @@ const API_KEY = process.env.API_KEY;
 
 let game;
 
+// 等待玩家資料
+function waitForPlayerInfo(encId, timeout = 5000) {
+  return new Promise((resolve) => {
+    const interval = 100; // 每 100ms 檢查一次
+    let elapsed = 0;
+
+    const check = setInterval(() => {
+      const playerInfo = game.state?.players?.[encId];
+      if (playerInfo) {
+        clearInterval(check);
+        resolve(playerInfo);
+      } else if ((elapsed += interval) >= timeout) {
+        clearInterval(check);
+        resolve(null); // 超時仍沒資料
+      }
+    }, interval);
+  });
+}
+
 // 連線 Gather
 function connectGather() {
   console.log("🔌 Connecting to Gather Town...");
@@ -144,6 +163,11 @@ function connectGather() {
           playerId = playerInfo.id || encId;
           name = playerInfo.name || "Unknown";
         }
+        // 等待完整玩家資訊
+        const playerInfo = await waitForPlayerInfo(encId);
+    
+        const playerId = playerInfo?.id || encId;
+        const name = playerInfo?.name || "Unknown";
   
         saveEvent({ playerId, event: "playerJoins", timestamp });
         console.log("📥 playerJoins saved:", playerId, timestamp, name);
