@@ -143,7 +143,7 @@ function connectGather() {
   const activePlayers = new Set();
   
   // Player Joins
-  game.subscribeToEvent("playerJoins", (data) => {
+  game.subscribeToEvent("playerJoins", async (data) => {
     try {
       console.log("DEBUG playerJoins event:", data);
   
@@ -153,19 +153,9 @@ function connectGather() {
       if (!activePlayers.has(encId)) {
         activePlayers.add(encId);
   
-        // 先預設名字為 Unknown，避免直接讀取未初始化的 state
-        let playerId = encId;
-        let name = "Unknown";
-  
-        // 嘗試拿到玩家資訊（可能還沒同步完成，所以要先檢查）
-        if (game.state?.players?.[encId]) {
-          const playerInfo = game.state.players[encId];
-          playerId = playerInfo.id || encId;
-          name = playerInfo.name || "Unknown";
-        }
         // 等待完整玩家資訊
         const playerInfo = await waitForPlayerInfo(encId);
-    
+  
         const playerId = playerInfo?.id || encId;
         const name = playerInfo?.name || "Unknown";
   
