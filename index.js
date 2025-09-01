@@ -128,33 +128,36 @@ function registerHandlers() {
   handlersRegistered = true;
 
   // Player Joins
+  // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
     const encId = data.playerJoins.encId;
     const timestamp = new Date().toISOString();
-
-    playersCache[encId] = { name: "Unknown", joinedAt: timestamp };
-
+  
+    // 初始 username unknown
+    playersCache[encId] = { name: "unknown", joinedAt: timestamp };
+  
     // 存事件
-    saveEvent({ playerId: encId, event: "playerJoins", timestamp });
-
-    console.log(`📥 playerJoins saved: ${encId} ${timestamp} Unknown`);
+    saveEvent({ playerId: encId, username: "unknown", event: "playerJoins", timestamp });
+  
+    console.log(`📥 playerJoins saved: ${encId} ${timestamp} unknown`);
   });
-
+  
   // Player Sets Name
   game.subscribeToEvent("playerSetsName", (data) => {
     const { encId, name } = data.playerSetsName;
     const timestamp = new Date().toISOString();
-
+  
+    // 更新 cache
     if (playersCache[encId]) {
       playersCache[encId].name = name;
-      console.log(`✅ Name updated for ${encId}: ${name}`);
     } else {
       playersCache[encId] = { name, joinedAt: timestamp };
-      console.log(`📥 playerSetsName (late) saved: ${encId} ${name}`);
     }
-
-    // 存事件
-    saveEvent({ playerId: encId, event: `setName:${name}`, timestamp });
+  
+    // 存事件，event 還是 playerJoins，但 username 改成玩家名字
+    saveEvent({ playerId: encId, username: name, event: "playerJoins", timestamp });
+  
+    console.log(`✅ Name updated for ${encId}: ${name}`);
   });
 
   // Player Exits
