@@ -133,30 +133,15 @@ function registerHandlers() {
 
   // Player Joins
   game.subscribeToEvent("playerJoins", async (data) => {
-    try {
-      const encId = data?.playerJoins?.encId;
-      console.log("DEBUG playerJoins event:", data);
-      const timestamp = new Date().toISOString();
-
-      if (activeEncIds.has(encId)) {
-        console.log("⚠️ Duplicate join ignored for:", encId);
-        return;
-      }
-
-      // 等待玩家資訊就緒（避免剛連上 state 還沒同步）
-      const info = await waitForPlayerInfo(encId, 4000);
-      const playerId = info?.id ?? encId;     // 拿不到就先用 encId
-      const name = info?.name ?? "Unknown";
-
-      // 記錄映射，方便之後 playerExits 用
-      encIdToMeta.set(encId, { id: playerId, name });
-      activeEncIds.add(encId);
-
-      saveEvent({ playerId, event: "playerJoins", timestamp });
-      console.log("📥 playerJoins saved:", playerId, timestamp, name);
-    } catch (err) {
-      console.error("error in playerJoins handler:", err);
-    }
+    const encId = data.playerJoins.encId;
+    console.log("DEBUG playerJoins event:", data);
+  
+    // 等一下再查，避免 state 還沒更新
+    setTimeout(() => {
+      const player = game.state.players[encId];
+      const name = player?.name || "Unknown";
+      console.log(`📥 playerJoins saved: ${encId} ${new Date().toISOString()} ${name}`);
+    }, 500); // 0.5秒後再查
   });
 
   // Player Exits
