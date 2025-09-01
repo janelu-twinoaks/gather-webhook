@@ -130,13 +130,21 @@ function registerHandlers() {
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
     const encId = data.playerJoins.encId;
+    console.log("DEBUG playerJoins event:", data);
+
+    if (activePlayers.has(encId)) {
+      console.log("⚠️ Duplicate join ignored for:", encId);
+      return; // 已在場，跳過寫入
+    }
+    
     const timestamp = new Date().toISOString();
-  
-    // 初始 username unknown
-    playersCache[encId] = { name: "unknown", joinedAt: timestamp };
-  
+    const username = "unknown"; // 預設 unknown 名稱
+    
+    // 寫入暫存
     saveEvent({ playerId: encId, username: "unknown", event: "playerJoins", timestamp });
-    console.log(`📥 playerJoins saved: ${encId} ${timestamp} unknown`);
+    console.log(`📥 playerJoins saved: ${encId} ${timestamp} ${username}`);
+
+    activePlayers.add(encId); // 標記為在場
   });
   
   // Player Sets Name
@@ -157,31 +165,22 @@ function registerHandlers() {
   });
   
   // Player Exits
-  game.subscribeToEvent("playerExits", async (data) => {
-    try {
-      const encId = data?.playerExits?.encId;
-      const timestamp = new Date().toISOString();
-      console.log("DEBUG playerExits event:", data);
+  game.subscribeToEvent("playerExits", (data) => {
+    const encId = data.playerExits.encId;
+    const timestamp = new Date().toISOString();
+    console.log("DEBUG playerExits event:", data);
 
-      if (!activeEncIds.has(encId)) {
-        console.log("⚠️ Exit ignored (not active):", encId);
-        return;
-      }
-
-      let meta = encIdToMeta.get(encId);
-      if (!meta) {
-        const info = game?.state?.players?.[encId] || (await waitForPlayerInfo(encId, 500));
-        meta = { id: info?.id ?? encId, name: info?.name ?? "Unknown" };
-      }
-
-      activeEncIds.delete(encId);
-      encIdToMeta.delete(encId);
-
-      saveEvent({ playerId: meta.id, event: "playerExits", timestamp });
-      console.log("📥 playerExits saved:", meta.id, timestamp, meta.name);
-    } catch (err) {
-      console.error("error in playerExits handler:", err);
+    if (!activePlayers.has(encId)) {
+      console.log("⚠️ Exit ignored (not active):", encId);
+      return; // 已離開，跳過寫入
     }
+    // 如果有暫存名字可補
+    const username = encIdToMeta.get(encId)?.name ?? "unknown";
+  
+    saveEvent({ playerId: encId, username, event: "playerExits", timestamp });
+    console.log(`📥 playerExits saved: ${encId} ${timestamp} ${username}`);
+  
+    activePlayers.delete(encId); // 移出在場
   });
 }
 
