@@ -144,28 +144,19 @@ function connectGather() {
   
   // Player Joins
   game.subscribeToEvent("playerJoins", async (data) => {
-    try {
-      console.log("DEBUG playerJoins event:", data);
+    const encId = data?.playerJoins?.encId;
+    console.log("DEBUG playerJoins event:", data);
   
-      const encId = data?.playerJoins?.encId;
-      const timestamp = new Date().toISOString();
+    // 直接看看 participants 裡有沒有
+    const player = game.participants.get(encId);
+    console.log("DEBUG player from participants:", player);
   
-      if (!activePlayers.has(encId)) {
-        activePlayers.add(encId);
-  
-        // 等待完整玩家資訊
-        const playerInfo = await waitForPlayerInfo(encId);
-  
-        const playerId = playerInfo?.id || encId;
-        const name = playerInfo?.name || "Unknown";
-  
-        saveEvent({ playerId, event: "playerJoins", timestamp });
-        console.log("📥 playerJoins saved:", playerId, timestamp, name);
-      } else {
-        console.log("⚠️ Duplicate join ignored for:", encId);
-      }
-    } catch (err) {
-      console.error("error occurred in handler for playerJoins:", err);
+    const timestamp = new Date().toISOString();
+    if (player) {
+      saveEvent({ playerId: player.id, event: "playerJoins", timestamp });
+      console.log("📥 playerJoins saved:", player.id, timestamp, player.name);
+    } else {
+      console.log("⚠️ No player info yet for encId:", encId);
     }
   });
 
