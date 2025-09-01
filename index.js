@@ -116,12 +116,10 @@ function waitForPlayerInfo(encId, timeout = 5000, interval = 100) {
   });
 }
 
-const activeEncIds = new Set();
-const encIdToMeta = new Map();
+// ── 玩家追蹤變數 ──
+const activePlayers = new Set(); // 已 join 的玩家
+const playersCache = {}; // encId -> { name, joinedAt }
 let handlersRegistered = false;
-
-// 暫存玩家資料
-const playersCache = {};
 
 function registerHandlers() {
   if (handlersRegistered) return;
@@ -134,36 +132,39 @@ function registerHandlers() {
 
     if (activePlayers.has(encId)) {
       console.log("⚠️ Duplicate join ignored for:", encId);
-      return; // 已在場，跳過寫入
+      return; // 已在場，不重複寫入
     }
-    
+
     const timestamp = new Date().toISOString();
-    const username = "unknown"; // 預設 unknown 名稱
-    
-    // 寫入暫存
-    saveEvent({ playerId: encId, username: "unknown", event: "playerJoins", timestamp });
+    const username = "unknown";
+
+    // 暫存
+    playersCache[encId] = { name: username, joinedAt: timestamp };
+
+    // 寫入事件
+    saveEvent({ playerId: encId, username, event: "playerJoins", timestamp });
     console.log(`📥 playerJoins saved: ${encId} ${timestamp} ${username}`);
 
-    activePlayers.add(encId); // 標記為在場
+    activePlayers.add(encId);
   });
-  
+
   // Player Sets Name
   game.subscribeToEvent("playerSetsName", (data) => {
     const { encId, name } = data.playerSetsName;
     const timestamp = new Date().toISOString();
-  
-    // 更新 cache
+
+    // 更新暫存
     if (playersCache[encId]) {
       playersCache[encId].name = name;
     } else {
       playersCache[encId] = { name, joinedAt: timestamp };
     }
-  
-    // 存事件，event 還是 playerJoins，但 username 改成玩家名字
+
+    // 寫入事件（仍視為 join，但 username 更新）
     saveEvent({ playerId: encId, username: name, event: "playerJoins", timestamp });
     console.log(`✅ Name updated for ${encId}: ${name}`);
   });
-  
+
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
     const encId = data.playerExits.encId;
@@ -172,15 +173,16 @@ function registerHandlers() {
 
     if (!activePlayers.has(encId)) {
       console.log("⚠️ Exit ignored (not active):", encId);
-      return; // 已離開，跳過寫入
+      return;
     }
-    // 如果有暫存名字可補
-    const username = encIdToMeta.get(encId)?.name ?? "unknown";
-  
+
+    const username = playersCache[encId]?.name ?? "unknown";
+
     saveEvent({ playerId: encId, username, event: "playerExits", timestamp });
     console.log(`📥 playerExits saved: ${encId} ${timestamp} ${username}`);
-  
-    activePlayers.delete(encId); // 移出在場
+
+    activePlayers.delete(encId);
+    delete playersCache[encId];
   });
 }
 
@@ -193,7 +195,6 @@ function connectGather() {
   game.subscribeToConnection(async (connected) => {
     if (connected) {
       console.log("✅ Connected to Gather Town!");
-
       try {
         await game.waitForInit();
         const count = Object.keys(game?.state?.players ?? {}).length;
