@@ -131,18 +131,32 @@ function registerHandlers() {
   if (handlersRegistered) return;
   handlersRegistered = true;
 
-  // Player Joins
-  game.subscribeToEvent("playerJoins", async (data) => {
-    const encId = data.playerJoins.encId;
-    console.log("DEBUG playerJoins event:", data);
-  
-    // 等一下再查，避免 state 還沒更新
-    setTimeout(() => {
-      const player = game.state.players[encId];
-      const name = player?.name || "Unknown";
-      console.log(`📥 playerJoins saved: ${encId} ${new Date().toISOString()} ${name}`);
-    }, 500); // 0.5秒後再查
-  });
+// 暫存玩家資料
+const playersCache = {};
+
+// Player Joins
+game.subscribeToEvent("playerJoins", (data) => {
+  const encId = data.playerJoins.encId;
+  console.log("DEBUG playerJoins event:", data);
+
+  // 先存 encId，名字可能暫時 unknown
+  playersCache[encId] = { name: "Unknown", joinedAt: new Date().toISOString() };
+
+  console.log(`📥 playerJoins saved: ${encId} ${playersCache[encId].joinedAt} Unknown`);
+});
+
+// Player Sets Name (補名字)
+game.subscribeToEvent("playerSetsName", (data) => {
+  const { encId, name } = data.playerSetsName;
+  if (playersCache[encId]) {
+    playersCache[encId].name = name;
+    console.log(`✅ Name updated for ${encId}: ${name}`);
+  } else {
+    // 如果沒有 join cache，也補上
+    playersCache[encId] = { name, joinedAt: new Date().toISOString() };
+    console.log(`📥 playerSetsName (late) saved: ${encId} ${name}`);
+  }
+});
 
   // Player Exits
   game.subscribeToEvent("playerExits", async (data) => {
