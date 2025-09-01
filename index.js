@@ -125,32 +125,45 @@ function connectGather() {
   
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
-    console.log("DEBUG playerJoins event:", data); // 先看完整結構
-    const playerId = data?.playerJoins?.info?.id; // ✅ 在 info 裡面
-    const name = data?.playerJoins?.info?.name;
+    console.log("DEBUG playerJoins event:", data);
+  
+    const encId = data?.playerJoins?.encId;
     const timestamp = new Date().toISOString();
   
-    if (!activePlayers.has(playerId)) {
-      activePlayers.add(playerId);
+    if (!activePlayers.has(encId)) {
+      activePlayers.add(encId);
+  
+      // 嘗試拿到玩家資訊
+      const playerInfo = game.state.players[encId];
+      const playerId = playerInfo?.id || encId;
+      const name = playerInfo?.name || "Unknown";
+  
       saveEvent({ playerId, event: "playerJoins", timestamp });
-      console.log("📥 playerJoins saved:", playerId, timestamp);
+      console.log("📥 playerJoins saved:", playerId, timestamp, name);
     } else {
-      console.log("⚠️ Duplicate join ignored for:", playerId);
+      console.log("⚠️ Duplicate join ignored for:", encId);
     }
   });
   
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
-    const playerId = data?.playerExits?.info?.id; // ✅ 在 info 裡面
-    const name = data?.playerExits?.info?.name;
+    console.log("DEBUG playerExits event:", data);
+  
+    const encId = data?.playerExits?.encId;
     const timestamp = new Date().toISOString();
   
-    if (activePlayers.has(playerId)) {
-      activePlayers.delete(playerId);
+    if (!activePlayers.has(encId)) {
+      activePlayers.add(encId);
+  
+      // 嘗試拿到玩家資訊
+      const playerInfo = game.state.players[encId];
+      const playerId = playerInfo?.id || encId;
+      const name = playerInfo?.name || "Unknown";
+  
       saveEvent({ playerId, event: "playerExits", timestamp });
-      console.log("📥 playerExits saved:", playerId, timestamp);
+      console.log("📥 playerExits saved:", playerId, timestamp, name);
     } else {
-      console.log("⚠️ Exit ignored (not in activePlayers):", playerId);
+      console.log("⚠️ Duplicate exit ignored for:", encId);
     }
   });
 
