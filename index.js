@@ -105,91 +105,126 @@ const API_KEY = process.env.API_KEY;
 
 let game;
 
-// 等待玩家資料
-function waitForPlayerInfo(encId, timeout = 5000) {
+// 等待玩家資料（輪詢 game.state.players[encId]，直到有 or 超時）
+function waitForPlayerInfo(encId, timeout = 5000, interval = 100) {
   return new Promise((resolve) => {
-    const interval = 100; // 每 100ms 檢查一次
     let elapsed = 0;
-
-    const check = setInterval(() => {
-      const playerInfo = game.state?.players?.[encId];
-      if (playerInfo) {
-        clearInterval(check);
-        resolve(playerInfo);
+    const timer = setInterval(() => {
+      const info = game?.state?.players?.[encId];
+      if (info) {
+        clearInterval(timer);
+        resolve(info);
       } else if ((elapsed += interval) >= timeout) {
-        clearInterval(check);
-        resolve(null); // 超時仍沒資料
+        clearInterval(timer);
+        resolve(null); // 超時
       }
     }, interval);
   });
 }
 
-// 連線 Gather
+// 追蹤目前在場的 encId 與 encId->玩家資訊的對應
+const activeEncIds = new Set();
+const encIdToMeta = new Map();
+let handlersRegistered = false;
+
+function registerHandlers() {
+  if (handlersRegistered) return;
+  handlersRegistered = true;
+
+  // Player Joins
+  game.subscribeToEvent("playerJoins", async (data) => {
+    try {
+      const encId = data?.playerJoins?.encId;
+      console.log("DEBUG playerJoins event:", data);
+      const timestamp = new Date().toISOString();
+
+      if (activeEncIds.has(encId)) {
+        console.log("⚠️ Duplicate join ignored for:", encId);
+        return;
+      }
+
+      // 等待玩家資訊就緒（避免剛連上 state 還沒同步）
+      const info = await waitForPlayerInfo(encId, 4000);
+      const playerId = info?.id ?? encId;     // 拿不到就先用 encId
+      const name = info?.name ?? "Unknown";
+
+      // 記錄映射，方便之後 playerExits 用
+      encIdToMeta.set(encId, { id: playerId, name });
+      activeEncIds.add(encId);
+
+      saveEvent({ playerId, event: "playerJoins", timestamp });
+      console.log("📥 playerJoins saved:", playerId, timestamp, name);
+    } catch (err) {
+      console.error("error in playerJoins handler:", err);
+    }
+  });
+
+  // Player Exits
+  game.subscribeToEvent("playerExits", async (data) => {
+    try {
+      console.log("DEBUG playerExits event:", data);
+      const encId = data?.playerExits?.encId;
+      const timestamp = new Date().toISOString();
+
+      if (!activeEncIds.has(encId)) {
+        console.log("⚠️ Exit ignored (not active):", encId);
+        return;
+      }
+
+      // 先用先前保存的 meta，若沒有再嘗試從 state 補
+      let meta = encIdToMeta.get(encId);
+      if (!meta) {
+        const info = game?.state?.players?.[encId] || (await waitForPlayerInfo(encId, 500));
+        meta = { id: info?.id ?? encId, name: info?.name ?? "Unknown" };
+      }
+
+      activeEncIds.delete(encId);
+      encIdToMeta.delete(encId);
+
+      saveEvent({ playerId: meta.id, event: "playerExits", timestamp });
+      console.log("📥 playerExits saved:", meta.id, timestamp, meta.name);
+    } catch (err) {
+      console.error("error in playerExits handler:", err);
+    }
+  });
+}
+
+// 連線 Gather（先等初始化再註冊 handler）
 function connectGather() {
   console.log("🔌 Connecting to Gather Town...");
   game = new Game(SPACE_ID, () => Promise.resolve({ apiKey: API_KEY }));
   game.connect();
 
-  game.subscribeToConnection((connected) => {
+  game.subscribeToConnection(async (connected) => {
     if (connected) {
       console.log("✅ Connected to Gather Town!");
+
+      try {
+        // 等初始 state（官方文件也建議這樣做）
+        await game.waitForInit();
+        const count = Object.keys(game?.state?.players ?? {}).length;
+        console.log(`✅ Game init complete. Players in state: ${count}`);
+      } catch (e) {
+        console.warn("⚠️ waitForInit failed/timeout, will continue anyway:", e?.message || e);
+      }
+
+      // 註冊事件（只註冊一次）
+      registerHandlers();
     } else {
       console.log("❌ Disconnected, retrying in 5s...");
+      handlersRegistered = false; // 重新連線時重註冊
       setTimeout(connectGather, 5000);
-    }
-  });
-
-  // ── 玩家狀態暫存 ──
-  const activePlayers = new Set();
-  
-  // Player Joins
-  game.subscribeToEvent("playerJoins", async (data) => {
-    const encId = data?.playerJoins?.encId;
-    console.log("DEBUG playerJoins event:", data);
-  
-    // 從 game.state.players 取資料
-    const player = game.state.players[encId];
-    console.log("DEBUG player from state.players:", player);
-  
-    const timestamp = new Date().toISOString();
-    if (player) {
-      saveEvent({ playerId: player.id, event: "playerJoins", timestamp });
-      console.log("📥 playerJoins saved:", player.id, timestamp, player.name);
-    } else {
-      console.log("⚠️ No player info yet for encId:", encId);
-    }
-  });
-
-
-  // Player Exits
-  game.subscribeToEvent("playerExits", (data) => {
-    console.log("DEBUG playerExits event:", data);
-  
-    const encId = data?.playerExits?.encId;
-    const timestamp = new Date().toISOString();
-  
-    if (!activePlayers.has(encId)) {
-      activePlayers.add(encId);
-  
-      // 嘗試拿到玩家資訊
-      const playerInfo = game.state.players[encId];
-      const playerId = playerInfo?.id || encId;
-      const name = playerInfo?.name || "Unknown";
-  
-      saveEvent({ playerId, event: "playerExits", timestamp });
-      console.log("📥 playerExits saved:", playerId, timestamp, name);
-    } else {
-      console.log("⚠️ Duplicate exit ignored for:", encId);
     }
   });
 
   // Heartbeat
   setInterval(() => {
-    if (game.connected) game.spaceUpdates([], true);
+    if (game?.connected) game.spaceUpdates([], true);
   }, 20000);
 }
 
 connectGather();
+
 
 // ── 定時整理 JSON → Google Sheet ──
 
