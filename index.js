@@ -125,7 +125,8 @@ function connectGather() {
   
   // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
-    const playerId = data?.playerJoins?.playerId;
+    const playerId = data?.playerJoins?.info?.id; // ✅ 在 info 裡面
+    const name = data?.playerJoins?.info?.name;
     const timestamp = new Date().toISOString();
   
     if (!activePlayers.has(playerId)) {
@@ -139,7 +140,8 @@ function connectGather() {
   
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
-    const playerId = data?.playerExits?.playerId;
+    const playerId = data?.playerExits?.info?.id; // ✅ 在 info 裡面
+    const name = data?.playerExits?.info?.name;
     const timestamp = new Date().toISOString();
   
     if (activePlayers.has(playerId)) {
