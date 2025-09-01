@@ -50,12 +50,12 @@ async function appendEventsToSheet() {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
   if (!data.length) return console.log("📄 No events to append");
 
-  const values = data.map((e) => [e.playerId, e.event, e.timestamp]);
+  const values = data.map((e) => [e.playerId, e.username, e.event, e.timestamp]);
 
   try {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:C`,
+      range: `${SHEET_NAME}!A:D`,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values },
