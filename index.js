@@ -40,8 +40,8 @@ const sheets = google.sheets({ version: "v4", auth });
 // 新增事件到 JSON
 function saveEvent(event) {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
-  const { playerId, event: evt, timestamp } = event;
-  data.push({ playerId, event: evt, timestamp });
+  const { playerId, username, event: evt, timestamp } = event;
+  data.push({ playerId, username, event: evt, timestamp });
   fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
@@ -128,7 +128,6 @@ function registerHandlers() {
   handlersRegistered = true;
 
   // Player Joins
-  // Player Joins
   game.subscribeToEvent("playerJoins", (data) => {
     const encId = data.playerJoins.encId;
     const timestamp = new Date().toISOString();
@@ -136,9 +135,7 @@ function registerHandlers() {
     // 初始 username unknown
     playersCache[encId] = { name: "unknown", joinedAt: timestamp };
   
-    // 存事件
     saveEvent({ playerId: encId, username: "unknown", event: "playerJoins", timestamp });
-  
     console.log(`📥 playerJoins saved: ${encId} ${timestamp} unknown`);
   });
   
@@ -156,10 +153,9 @@ function registerHandlers() {
   
     // 存事件，event 還是 playerJoins，但 username 改成玩家名字
     saveEvent({ playerId: encId, username: name, event: "playerJoins", timestamp });
-  
     console.log(`✅ Name updated for ${encId}: ${name}`);
   });
-
+  
   // Player Exits
   game.subscribeToEvent("playerExits", async (data) => {
     try {
