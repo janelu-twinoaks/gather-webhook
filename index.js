@@ -147,9 +147,9 @@ function connectGather() {
     const encId = data?.playerJoins?.encId;
     console.log("DEBUG playerJoins event:", data);
   
-    // 直接看看 participants 裡有沒有
-    const player = game.participants.get(encId);
-    console.log("DEBUG player from participants:", player);
+    // 從 game.state.players 取資料
+    const player = game.state.players[encId];
+    console.log("DEBUG player from state.players:", player);
   
     const timestamp = new Date().toISOString();
     if (player) {
@@ -159,6 +159,7 @@ function connectGather() {
       console.log("⚠️ No player info yet for encId:", encId);
     }
   });
+
 
   // Player Exits
   game.subscribeToEvent("playerExits", (data) => {
