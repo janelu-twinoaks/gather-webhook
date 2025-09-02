@@ -151,18 +151,26 @@ function registerHandlers() {
   // Player Sets Name
   game.subscribeToEvent("playerSetsName", (data) => {
     const { encId, name } = data.playerSetsName;
-    const timestamp = new Date().toISOString();
-
-    // 更新暫存
+  
+    // 只更新暫存，不再新增事件
     if (playersCache[encId]) {
       playersCache[encId].name = name;
+  
+      // 更新 events.json 裡最後一筆 join 記錄的 username
+      let events = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
+      for (let i = events.length - 1; i >= 0; i--) {
+        if (events[i].playerId === encId && events[i].event === "playerJoins") {
+          events[i].username = name;
+          break;
+        }
+      }
+      fs.writeFileSync(EVENTS_FILE, JSON.stringify(events, null, 2), "utf8");
+      console.log(`✅ Updated name for ${encId}: ${name}`);
     } else {
-      playersCache[encId] = { name, joinedAt: timestamp };
+      // 假如玩家直接送名字但還沒 join，就暫存起來
+      playersCache[encId] = { name, joinedAt: new Date().toISOString() };
+      console.log(`ℹ️ Name cached for ${encId}: ${name} (no join yet)`);
     }
-
-    // 寫入事件（仍視為 join，但 username 更新）
-    saveEvent({ playerId: encId, username: name, event: "playerJoins", timestamp });
-    console.log(`✅ Name updated for ${encId}: ${name}`);
   });
 
   // Player Exits
